@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Interactive Web Mapping</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+    <style>
+        h2, h3 {
+            margin: 10px;
+            font-size: 18px;
+        }
+
+        h3 {
+            font-size: 16px;
+        }
+
+        p {
+            margin: 10px;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+        }
+
+        .map-overlay {
+            position: absolute;
+            padding-bottom: 15px;
+            bottom: 0;
+            left: 0;
+            background: rgba(255, 255, 255, 0.8);
+            border-style: solid;
+            border-width: 1px;
+            border-color: rgba(0, 0, 0, 0.2);
+            margin-left: 20px;
+            font-family: Arial, sans-serif;
+            overflow: auto;
+            border-radius: 3px;
+        }
+
+        #features {
+            top: 0;
+            height: 100px;
+            margin-top: 20px;
+            width: 250px;
+        }
+
+        #legend {
+            padding: 10px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            line-height: 18px;
+            height: 210px;
+            margin-bottom: 40px;
+            width: 150px;
+        }
+
+        .legend-key {
+            display: inline-block;
+            border-radius: 20%;
+            width: 10px;
+            height: 10px;
+            margin-right: 5px;
+        }
+
+        .mapboxgl-canvas-container.mapboxgl-interactive,
+        .mapboxgl-ctrl-group button.mapboxgl-ctrl-compass {
+            cursor: unset;
+        }
+
+    </style>
+</head> 
+
+<body>
+    <div id="map"></div>
+    <div class='map-overlay' id='features'>
+        <h2>Washington COVID Vaccination Rate</h2>
+        <div id='text-description'>
+            <p>Hover over a state!</p>
+        </div>
+    </div>
+    <div class='map-overlay' id='legend'></div>
+
+
+    <script>
+        // initialize basemmap
+        mapboxgl.accessToken =
+            'pk.eyJ1IjoiY2FydGIyMCIsImEiOiJjbG9vdTlka2gwMXZlMnJwdHhkZGJ5ZHZsIn0.pe21frQ6A_Q5QZjbW9JfbA';
+        const map = new mapboxgl.Map({
+            container: 'map', // container ID
+            style: 'mapbox://styles/mapbox/light-v10', // style URL
+            zoom: 6.3, // starting zoom
+            center: [-121, 47.3] // starting center
+        });
+
+
+        async function geojsonFetch() {
+            let response = await fetch('assets/wa-covid-data-102521.geojson');
+            let state_data = await response.json();
+
+            
+        
+            map.on('load', function loadingData() {
+                map.addSource('state_data', {
+                    type: 'geojson',
+                    data: state_data
+                });
+
+                map.addLayer({
+                    'id': 'state_data_layer',
+                    'type': 'fill',
+                    'source': 'state_data',
+                    'paint': {
+                        'fill-color': [
+                            'step',
+                            ['get', 'fullyVaxPer10k'],
+                            '#f7faf8',   // stop_output_0
+                            1000,          // stop_input_0
+                            '#e4f7e7',   // stop_output_1
+                            2000,          // stop_input_1
+                            '#ccfcd5',   // stop_output_2
+                            3000,          // stop_input_2
+                            '#aef5ba',   // stop_output_3
+                            4000,         // stop_input_3
+                            '#9cf7ab',   // stop_output_4
+                            5000,         // stop_input_4
+                            '#8bf79d',   // stop_output_5
+                            6000,         // stop_input_5
+                            '#17fc63',   // stop_output_6
+                            7000,        // stop_input_6
+                            "#00ff2a"    // stop_output_7
+                        ],
+                        'fill-outline-color': '#BBBBBB',
+                        'fill-opacity': 0.7,
+                    }
+                });
+
+                const layers = [
+                    '0-999',
+                    '1000-1999',
+                    '2000-2999',
+                    '3000-3999',
+                    '4000-4999',
+                    '5000-7999',
+                    '6000-6999',
+                    '7000-10000'
+                ];
+                const colors = [
+                    '#f7faf8',
+                    '#e4f7e7',
+                    '#ccfcd5',
+                    '#aef5ba',
+                    '#9cf7ab',
+                    '#8bf79d',
+                    '#17fc63',
+                    '#00ff2a'
+                ];
+
+                // create legend
+                const legend = document.getElementById('legend');
+                legend.innerHTML = "<b>Vaccination Rate<br>(per 10k people)</b><br><br>";
+
+
+                layers.forEach((layer, i) => {
+                    const color = colors[i];
+                    const item = document.createElement('div');
+                    const key = document.createElement('span');
+                    key.className = 'legend-key';
+                    key.style.backgroundColor = color;
+
+                    const value = document.createElement('span');
+                    value.innerHTML = `${layer}`;
+                    item.appendChild(key);
+                    item.appendChild(value);
+                    legend.appendChild(item);
+                });
+            });
+
+
+            map.on('mousemove', ({point}) => {
+                const state = map.queryRenderedFeatures(point, {
+                    layers: ['state_data_layer']
+                });
+                document.getElementById('text-description').innerHTML = state.length ?
+                    `<h3>${state[0].properties.name}</h3><p><strong><em>${state[0].properties.fullyVaxPer10k}</strong> people per 10,000</em></p>` :
+                    `<p>Hover over a state!</p>`;
+            });
+
+        }
+
+
+
+
+        geojsonFetch();
+
+    </script>
+
+</body>
+
+
+
+</html>
